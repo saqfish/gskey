@@ -9,11 +9,14 @@ import (
 	"strings"
 )
 
+type Key struct {
+	l int
+	s string
+}
+
 func main() {
-	var keys []string
+	var keys []Key
 	var shift bool
-	var ctrl bool
-	var alt bool
 
 	deviceOpt := flag.Int("dev", -1, "Device number")
 	delimiterOpt := flag.String("d", "", "character between keys")
@@ -48,36 +51,31 @@ func main() {
 		for {
 			select {
 			case event := <-eventMap.Events():
-				var k string
+				var k Key
+				var tk string
+
 				if _, ok := shiftkeys[int(event.Field)]; ok {
 					shift = !shift
 				}
-				if _, ok := ctrlkeys[int(event.Field)]; ok {
-					ctrl = !ctrl
-				}
-				if _, ok := altkeys[int(event.Field)]; ok {
-					alt = !alt
-				}
-				if kv, ok := keymap[int(event.Field)]; ok {
+
+				if event.Type == xinput.KeyPressEvent {
 					var i int
-					var prefix string
 
 					if shift {
 						i = 1
 					}
-					if ctrl {
-						prefix += "Ctrl-"
+
+					if kv, ok := keymap[int(event.Field)]; ok {
+
+						tk = fmt.Sprintf("%s%s", kv[i], *delimiterOpt)
+
+					} else {
+						pkeys(keys)
 					}
 
-					if alt {
-						prefix += "Alt-"
-					}
+					k = Key{len(tk), tk}
 
-					if event.Type == xinput.KeyReleaseEvent {
-						k = fmt.Sprintf("%s%s%s", prefix, kv[i], *delimiterOpt)
-					}
-
-					count := *keyCountOpt * 2
+					count := *keyCountOpt
 
 					if len(keys) > count {
 						if *reverseOpt {
@@ -87,13 +85,12 @@ func main() {
 						}
 					}
 					if *reverseOpt {
-						keys = append([]string{k}, keys...)
+						keys = append([]Key{k}, keys...)
 					} else {
 						keys = append(keys, k)
 					}
-					s := strings.Join(keys, "")
+					pkeys(keys)
 
-					fmt.Printf("%s\n", s)
 				}
 			case <-stopChan:
 				break loop
@@ -102,4 +99,14 @@ func main() {
 
 		_ = eventMap.Close()
 	}
+}
+
+func pkeys(keys []Key) {
+	var tks []string
+	for _, atk := range keys {
+		tks = append(tks, atk.s)
+	}
+	s := strings.Join(tks, "")
+	fmt.Printf("%s\n", s)
+
 }
